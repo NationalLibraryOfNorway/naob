@@ -151,8 +151,10 @@ export default function App() {
           valA = parseInt(valA) || 0;
           valB = parseInt(valB) || 0;
         } else if (sortConfig.key === 'left_context') {
-          valA = valA.toString().trim().split('').reverse().join('').toLowerCase();
-          valB = valB.toString().trim().split('').reverse().join('').toLowerCase();
+          // Sorter på ordnivå baklengs (slik at 'store hus' og 'stort hus' havner sammen)
+          const prep = (s) => s.toString().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '').trim().split(/\s+/).reverse().join(' ');
+          valA = prep(valA);
+          valB = prep(valB);
         } else {
           valA = valA.toString().toLowerCase();
           valB = valB.toString().toLowerCase();
