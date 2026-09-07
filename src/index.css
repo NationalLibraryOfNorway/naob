@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #0045bb;
+  --bg-warm: #FDFBF7;
+  --panel-warm: #F8F5EE;
+  --text-main: #333333;
+}
+
+body {
+  background-color: var(--bg-warm);
+  color: var(--text-main);
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
