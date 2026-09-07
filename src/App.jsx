@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Download, ExternalLink, Settings2, Loader2, BookOpen } from 'lucide-react';
+import { Search, Download, ExternalLink, Settings2, Loader2, BookOpen, ArrowUpDown } from 'lucide-react';
 import { loadMetadata, fetchConcordances, formatConcordance, formatUrl, exportToExcel } from './utils';
 import './index.css';
 
@@ -17,6 +17,7 @@ export default function App() {
   const [splitContext, setSplitContext] = useState(false);
   const [filename, setFilename] = useState('konkordanser.xlsx');
   
+  const [sortConfig, setSortConfig] = useState({ key: 'year', direction: 'ascending' });
   const [results, setResults] = useState([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [error, setError] = useState('');
@@ -76,21 +77,24 @@ export default function App() {
         const meta = metadata[item.urn] || {};
         const { left_context, target, right_context, raw } = formatConcordance(item.concordance);
         
+        let formattedYear = '';
+        if (meta.year) {
+          const yearInt = parseInt(meta.year);
+          formattedYear = isNaN(yearInt) ? meta.year : yearInt.toString();
+        }
+
         return {
           concordance: raw,
           left_context,
           target,
           right_context,
-          year: meta.year || '',
+          year: formattedYear,
           url: formatUrl(item.urn, search),
           authors: meta.authors || '',
           title: meta.title || '',
           urn: item.urn
         };
       });
-      
-      // Sort by year
-      formatted.sort((a, b) => parseInt(a.year || 0) - parseInt(b.year || 0));
       
       setResults(formatted);
     } catch (err) {
@@ -101,8 +105,39 @@ export default function App() {
     }
   };
 
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedResults = useMemo(() => {
+    let sortableItems = [...results];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        let valA = a[sortConfig.key] || '';
+        let valB = b[sortConfig.key] || '';
+        
+        if (sortConfig.key === 'year') {
+          valA = parseInt(valA) || 0;
+          valB = parseInt(valB) || 0;
+        } else {
+          valA = valA.toString().toLowerCase();
+          valB = valB.toString().toLowerCase();
+        }
+
+        if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [results, sortConfig]);
+
   const handleExport = () => {
-    const exportData = results.map(r => {
+    const exportData = sortedResults.map(r => {
       if (splitContext) {
         return {
           "Venstre kontekst": r.left_context,
@@ -249,7 +284,7 @@ export default function App() {
 
         {/* Tabell */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-          {results.length > 0 ? (
+          {sortedResults.length > 0 ? (
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700 font-semibold border-b">
                 <tr>
@@ -262,14 +297,20 @@ export default function App() {
                   ) : (
                     <th className="px-4 py-3">Konkordans</th>
                   )}
-                  <th className="px-4 py-3">Årstall</th>
-                  <th className="px-4 py-3 max-w-[150px]">Forfatter</th>
-                  <th className="px-4 py-3 max-w-[200px]">Tittel</th>
+                  <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => requestSort('year')}>
+                    <div className="flex items-center gap-1">Årstall <ArrowUpDown size={14} className="text-gray-400" /></div>
+                  </th>
+                  <th className="px-4 py-3 max-w-[150px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('authors')}>
+                    <div className="flex items-center gap-1">Forfatter <ArrowUpDown size={14} className="text-gray-400" /></div>
+                  </th>
+                  <th className="px-4 py-3 max-w-[200px] cursor-pointer hover:bg-gray-100" onClick={() => requestSort('title')}>
+                    <div className="flex items-center gap-1">Tittel <ArrowUpDown size={14} className="text-gray-400" /></div>
+                  </th>
                   <th className="px-4 py-3 text-center">nb.no</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {results.map((r, i) => (
+                {sortedResults.map((r, i) => (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
                     {splitContext ? (
                       <>
