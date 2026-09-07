@@ -123,6 +123,10 @@ export default function App() {
         if (sortConfig.key === 'year') {
           valA = parseInt(valA) || 0;
           valB = parseInt(valB) || 0;
+        } else if (sortConfig.key === 'left_context') {
+          // I språkvitenskap sorterer man venstre kontekst baklengs (nærmest søkeordet først)
+          valA = valA.toString().trim().split('').reverse().join('').toLowerCase();
+          valB = valB.toString().trim().split('').reverse().join('').toLowerCase();
         } else {
           valA = valA.toString().toLowerCase();
           valB = valB.toString().toLowerCase();
@@ -290,12 +294,18 @@ export default function App() {
                 <tr>
                   {splitContext ? (
                     <>
-                      <th className="px-4 py-3 text-right">Venstre kontekst</th>
+                      <th className="px-4 py-3 text-right cursor-pointer hover:bg-gray-100" onClick={() => requestSort('left_context')}>
+                        <div className="flex items-center justify-end gap-1">Venstre kontekst <ArrowUpDown size={14} className="text-gray-400" /></div>
+                      </th>
                       <th className="px-4 py-3 text-center">Søkeord</th>
-                      <th className="px-4 py-3">Høyre kontekst</th>
+                      <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => requestSort('right_context')}>
+                        <div className="flex items-center gap-1">Høyre kontekst <ArrowUpDown size={14} className="text-gray-400" /></div>
+                      </th>
                     </>
                   ) : (
-                    <th className="px-4 py-3">Konkordans</th>
+                    <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => requestSort('concordance')}>
+                      <div className="flex items-center gap-1">Konkordans <ArrowUpDown size={14} className="text-gray-400" /></div>
+                    </th>
                   )}
                   <th className="px-4 py-3 cursor-pointer hover:bg-gray-100" onClick={() => requestSort('year')}>
                     <div className="flex items-center gap-1">Årstall <ArrowUpDown size={14} className="text-gray-400" /></div>
