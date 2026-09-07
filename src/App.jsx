@@ -19,6 +19,8 @@ export default function App() {
   
   const [sortConfig, setSortConfig] = useState({ key: 'year', direction: 'ascending' });
   const [results, setResults] = useState([]);
+  const [totalHits, setTotalHits] = useState(0);
+  const [filterText, setFilterText] = useState('');
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [error, setError] = useState('');
 
@@ -69,11 +71,20 @@ export default function App() {
         return year >= startYear && year <= endYear;
       });
 
-      // 2. Fetch from DHlab API
-      const rawConc = await fetchConcordances(filteredUrns, search, sampleSize);
+      // 2. Fetch from DHlab API (opptil 10000 som i Streamlit)
+      const rawConc = await fetchConcordances(filteredUrns, search, 10000);
+      setTotalHits(rawConc.length);
+      
+      // Sample ned til valgt antall hvis nødvendig (tilfeldig utvalg slik Streamlit gjorde)
+      let sampledConc = rawConc;
+      const sizeLimit = parseInt(sampleSize) || 150;
+      if (rawConc.length > sizeLimit) {
+        const shuffled = [...rawConc].sort(() => 0.5 - Math.random());
+        sampledConc = shuffled.slice(0, sizeLimit);
+      }
       
       // 3. Format and merge with metadata
-      const formatted = rawConc.map(item => {
+      const formatted = sampledConc.map(item => {
         const meta = metadata[item.urn] || {};
         const { left_context, target, right_context, raw } = formatConcordance(item.concordance);
         
@@ -113,10 +124,26 @@ export default function App() {
     setSortConfig({ key, direction });
   };
 
-  const sortedResults = useMemo(() => {
-    let sortableItems = [...results];
+  const filteredAndSortedResults = useMemo(() => {
+    let items = [...results];
+
+    // 1. Filter by text
+    if (filterText) {
+      const lowerF = filterText.toLowerCase();
+      items = items.filter(r => 
+        (r.left_context || '').toLowerCase().includes(lowerF) ||
+        (r.target || '').toLowerCase().includes(lowerF) ||
+        (r.right_context || '').toLowerCase().includes(lowerF) ||
+        (r.concordance || '').toLowerCase().includes(lowerF) ||
+        (r.authors || '').toLowerCase().includes(lowerF) ||
+        (r.title || '').toLowerCase().includes(lowerF) ||
+        (r.year || '').toString().includes(lowerF)
+      );
+    }
+
+    // 2. Sort
     if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
+      items.sort((a, b) => {
         let valA = a[sortConfig.key] || '';
         let valB = b[sortConfig.key] || '';
         
@@ -124,7 +151,6 @@ export default function App() {
           valA = parseInt(valA) || 0;
           valB = parseInt(valB) || 0;
         } else if (sortConfig.key === 'left_context') {
-          // I språkvitenskap sorterer man venstre kontekst baklengs (nærmest søkeordet først)
           valA = valA.toString().trim().split('').reverse().join('').toLowerCase();
           valB = valB.toString().trim().split('').reverse().join('').toLowerCase();
         } else {
@@ -137,11 +163,11 @@ export default function App() {
         return 0;
       });
     }
-    return sortableItems;
-  }, [results, sortConfig]);
+    return items;
+  }, [results, sortConfig, filterText]);
 
   const handleExport = () => {
-    const exportData = sortedResults.map(r => {
+    const exportData = filteredAndSortedResults.map(r => {
       if (splitContext) {
         return {
           "Venstre kontekst": r.left_context,
@@ -225,8 +251,9 @@ export default function App() {
           <label className="font-semibold text-sm">Maks antall treff</label>
           <input
             type="number"
-            value={sampleSize}
-            onChange={(e) => setSampleSize(Number(e.target.value))}
+            min="1"
+            value={sampleSize === '' ? '' : sampleSize}
+            onChange={(e) => setSampleSize(e.target.value === '' ? '' : Number(e.target.value))}
             className="px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
           />
         </div>
@@ -254,10 +281,23 @@ export default function App() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
           <div className="font-medium text-gray-700">
-            Antall konkordanser totalt: <span className="font-bold text-black">{results.length}</span>
+            Antall konkordanser totalt: <span className="font-bold text-black">{totalHits}</span>
+            {totalHits > results.length && (
+              <span className="text-gray-500 ml-1">
+                (viser et tilfeldig utvalg på {results.length})
+              </span>
+            )}
           </div>
           
           <div className="flex flex-wrap items-center gap-6">
+            <input 
+              type="text" 
+              placeholder="Søk i trefflisten..."
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+            />
+
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -288,7 +328,7 @@ export default function App() {
 
         {/* Tabell */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-          {sortedResults.length > 0 ? (
+          {filteredAndSortedResults.length > 0 ? (
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700 font-semibold border-b">
                 <tr>
@@ -320,7 +360,7 @@ export default function App() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sortedResults.map((r, i) => (
+                {filteredAndSortedResults.map((r, i) => (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
                     {splitContext ? (
                       <>
